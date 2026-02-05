@@ -109,9 +109,15 @@ export async function initializeTransformers(
   modelId: TransformersModelId = TRANSFORMERS_MODELS.SMOL_360M,
   onProgress?: ProgressCallback
 ): Promise<void> {
-  if (isTransformersModelLoaded()) return;
+  console.log('[llm] initializeTransformers called with model:', modelId);
+
+  if (isTransformersModelLoaded()) {
+    console.log('[llm] Model already loaded, skipping');
+    return;
+  }
 
   isInitializing = true;
+  console.log('[llm] Starting Transformers.js initialization...');
 
   try {
     await loadTransformersModel(modelId, (progress) => {
@@ -126,6 +132,10 @@ export async function initializeTransformers(
       onProgress?.(pct, status);
     });
     currentBackend = 'transformers';
+    console.log('[llm] Transformers.js initialization successful');
+  } catch (error) {
+    console.error('[llm] Transformers.js initialization failed:', error);
+    throw error; // Re-throw to propagate to caller
   } finally {
     isInitializing = false;
   }
@@ -138,10 +148,18 @@ export async function initializeLLM(
   _config: LLMConfig = DEFAULT_LLM_CONFIG,
   onProgress?: ProgressCallback
 ): Promise<LLMBackend> {
+  console.log('[llm] initializeLLM called');
+
   // Always use Transformers.js by default for faster initial load
   // Users can optionally switch to WebLLM later for better quality
-  await initializeTransformers(TRANSFORMERS_MODELS.OPENELM, onProgress);
-  return 'transformers';
+  try {
+    await initializeTransformers(TRANSFORMERS_MODELS.OPENELM, onProgress);
+    console.log('[llm] initializeLLM completed successfully');
+    return 'transformers';
+  } catch (error) {
+    console.error('[llm] initializeLLM failed:', error);
+    throw error; // Re-throw to propagate to useLLM hook
+  }
 }
 
 /**
