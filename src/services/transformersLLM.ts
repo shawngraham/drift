@@ -1,16 +1,45 @@
-import { pipeline, env } from '@huggingface/transformers';
-
-// Configure Transformers.js for better mobile compatibility
-// Disable local model check to force CDN fetch
-env.allowLocalModels = false;
-// Use remote models from Hugging Face CDN
-env.useBrowserCache = true;
-
 /**
  * Transformers.js LLM Service
  * Fallback for devices without WebGPU support
  * Uses smaller models that run on WebGL/WASM
+ *
+ * IMPORTANT: We use dynamic import to avoid "can't access lexical declaration
+ * before initialization" errors on mobile browsers. The Transformers.js library
+ * has complex initialization that can fail if loaded too early.
  */
+
+// Cached reference to the dynamically imported module
+let transformersModule: typeof import('@huggingface/transformers') | null = null;
+
+/**
+ * Dynamically import and configure Transformers.js
+ * This avoids module initialization issues on mobile browsers
+ */
+async function getTransformers() {
+  if (transformersModule) {
+    return transformersModule;
+  }
+
+  console.log('[Transformers.js] Dynamically importing library...');
+
+  try {
+    transformersModule = await import('@huggingface/transformers');
+
+    // Configure environment after successful import
+    try {
+      transformersModule.env.allowLocalModels = false;
+      transformersModule.env.useBrowserCache = true;
+      console.log('[Transformers.js] Library loaded and configured');
+    } catch (envError) {
+      console.warn('[Transformers.js] Failed to configure env:', envError);
+    }
+
+    return transformersModule;
+  } catch (error) {
+    console.error('[Transformers.js] Failed to import library:', error);
+    throw new Error(`Failed to load AI library: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 // Available small models (in order of size/quality tradeoff)
 export const TRANSFORMERS_MODELS = {
@@ -176,8 +205,11 @@ export async function loadTransformersModel(
     const loadPromise = (async () => {
       console.log('[Transformers.js] Calling pipeline()...');
 
+      // Dynamically import the library to avoid mobile initialization issues
+      const transformers = await getTransformers();
+
       // Use type assertion to avoid complex union type errors
-      const result = await (pipeline as Function)('text-generation', modelId, {
+      const result = await (transformers.pipeline as Function)('text-generation', modelId, {
         progress_callback: (progressData: { status: string; progress?: number; file?: string }) => {
           lastProgressTime = Date.now(); // Update last progress time
 
