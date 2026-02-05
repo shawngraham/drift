@@ -20,8 +20,8 @@ export const TRANSFORMERS_MODELS = {
 
 export type TransformersModelId = typeof TRANSFORMERS_MODELS[keyof typeof TRANSFORMERS_MODELS];
 
-// Default to SmolLM-360M for good balance of size and quality
-const DEFAULT_MODEL = TRANSFORMERS_MODELS.SMOL_360M;
+// Default to Qwen2-0.5B for good balance of size and quality
+const DEFAULT_MODEL = TRANSFORMERS_MODELS.QWEN_0_5B;
 
 // Use a more generic type to avoid complex union types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +59,7 @@ export async function loadTransformersModel(
   }
 
   if (generator && currentModelId === modelId) {
-    onProgress?.({ status: 'ready', progress: 100 });
+    onProgress?.({ status: 'ready', progress: 1 });
     return;
   }
 
@@ -72,19 +72,21 @@ export async function loadTransformersModel(
     generator = await (pipeline as Function)('text-generation', modelId, {
       progress_callback: (progressData: { status: string; progress?: number; file?: string }) => {
         if (progressData.status === 'progress' && progressData.progress !== undefined) {
+          // Clamp progress to 0-100 range (Transformers.js returns 0-100)
+          const clampedProgress = Math.min(100, Math.max(0, progressData.progress)) / 100;
           onProgress?.({
             status: 'downloading',
-            progress: progressData.progress,
+            progress: clampedProgress,
             file: progressData.file,
           });
         } else if (progressData.status === 'done') {
-          onProgress?.({ status: 'loading', progress: 95 });
+          onProgress?.({ status: 'loading', progress: 0.95 });
         }
       },
     });
 
     currentModelId = modelId;
-    onProgress?.({ status: 'ready', progress: 100 });
+    onProgress?.({ status: 'ready', progress: 1 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     onProgress?.({ status: 'error', progress: 0, error: message });

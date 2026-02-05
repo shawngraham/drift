@@ -140,7 +140,7 @@ export async function initializeLLM(
 ): Promise<LLMBackend> {
   // Always use Transformers.js by default for faster initial load
   // Users can optionally switch to WebLLM later for better quality
-  await initializeTransformers(TRANSFORMERS_MODELS.SMOL_360M, onProgress);
+  await initializeTransformers(TRANSFORMERS_MODELS.QWEN_0_5B, onProgress);
   return 'transformers';
 }
 
@@ -242,7 +242,7 @@ export function getCurrentModel(): string | null {
     return DEFAULT_LLM_CONFIG.model;
   }
   if (currentBackend === 'transformers') {
-    return 'SmolLM-360M (Transformers.js)';
+    return 'Qwen2-0.5B (Transformers.js)';
   }
   return null;
 }
