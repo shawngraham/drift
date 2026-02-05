@@ -4,7 +4,7 @@ import { useGeolocation } from '../../hooks/useGeolocation';
 import { useLLM } from '../../hooks/useLLM';
 import { useAudio } from '../../hooks/useAudio';
 import { playSonarPing } from '../../services/audioEngine';
-import { isMobileDevice } from '../../services/transformersLLM';
+import { isMobileDevice, isTransformersSupported, getDeviceCapabilities } from '../../services/transformersLLM';
 
 type OnboardingStep = 'intro' | 'location' | 'model' | 'ready';
 
@@ -215,9 +215,17 @@ function ModelStep({
 }) {
   const [isMobile, setIsMobile] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
+  const [deviceInfo, setDeviceInfo] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMobile(isMobileDevice());
+    // Check support and log capabilities
+    isTransformersSupported();
+    const caps = getDeviceCapabilities();
+    // Show a condensed device info for debugging
+    setDeviceInfo(
+      `${caps.isMobile ? 'Mobile' : 'Desktop'} | WebGL${caps.hasWebGL2 ? '2' : caps.hasWebGL ? '1' : ':No'} | SAB:${caps.hasSharedArrayBuffer ? 'Yes' : 'No'}`
+    );
   }, []);
 
   // Track loading time to show helpful messages
@@ -278,11 +286,21 @@ function ModelStep({
               Mobile devices may take longer. Keep this tab active.
             </p>
           )}
+          {deviceInfo && (
+            <p className="text-phosphor/30 text-[10px] text-center font-mono">
+              {deviceInfo}
+            </p>
+          )}
         </div>
       ) : error ? (
         <div className="space-y-4">
           <div className="p-4 bg-red-900/20 border border-red-900/50 rounded">
             <p className="text-red-400 text-sm">{error}</p>
+            {deviceInfo && (
+              <p className="text-red-400/50 text-[10px] mt-2 font-mono">
+                {deviceInfo}
+              </p>
+            )}
           </div>
           {isMobile && (
             <p className="text-amber/60 text-xs text-center">
@@ -322,6 +340,11 @@ function ModelStep({
             <p className="text-phosphor/80 text-xs text-center">
               Spectral Engine: ~270MB download
             </p>
+            {deviceInfo && (
+              <p className="text-phosphor/40 text-[10px] text-center mt-1 font-mono">
+                {deviceInfo}
+              </p>
+            )}
           </div>
 
           <button
