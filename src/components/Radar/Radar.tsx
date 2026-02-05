@@ -10,6 +10,7 @@ interface RadarProps {
 /**
  * Radar/Compass component
  * Displays user position, nearby Wikipedia articles, and phantom location
+ * North is always at the top - heading indicator shows user's facing direction
  */
 export function Radar({ size = 300 }: RadarProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,43 +37,39 @@ export function Radar({ size = 300 }: RadarProps) {
       ctx.fillStyle = '#0a0a0a';
       ctx.fillRect(0, 0, width, height);
 
-      // Apply rotation based on heading
       ctx.save();
       ctx.translate(centerX, centerY);
-      if (heading !== null) {
-        ctx.rotate((-heading * Math.PI) / 180);
-      }
 
-      // Draw range rings
+      // Draw range rings (fixed, north up)
       drawRangeRings(ctx, radius, settings.radarRange);
 
-      // Draw cardinal directions
+      // Draw cardinal directions (fixed, north up)
       drawCardinals(ctx, radius);
 
-      // Draw scan line (animated)
+      // Draw scan line (animated, fixed orientation)
       drawScanLine(ctx, radius, timestamp);
 
-      // Draw articles
+      // Draw articles at their true bearings (north up)
       if (position) {
         drawArticles(ctx, radius, nearbyArticles, position, settings.radarRange);
       }
 
-      // Draw phantom location
+      // Draw phantom location at true bearing (north up)
       if (currentPhantom && position) {
         drawPhantom(ctx, radius, currentPhantom, position, settings.radarRange, timestamp);
       }
 
+      // Draw heading indicator (rotates with user's heading)
+      if (heading !== null) {
+        drawHeadingIndicator(ctx, radius, heading, timestamp);
+      }
+
       ctx.restore();
 
-      // Draw center point (user)
+      // Draw center point (user) - always at center
       drawCenter(ctx, centerX, centerY, isGenerating, timestamp);
-
-      // Draw heading indicator (fixed, not rotated)
-      if (heading !== null) {
-        drawHeadingIndicator(ctx, centerX, centerY, radius);
-      }
     },
-    [position, heading, nearbyArticles, currentPhantom, isGenerating, settings.radarRange]
+    [position, heading, nearbyArticles, currentPhantom, isGenerating, settings.radarRange, size]
   );
 
   // Animation loop
@@ -213,6 +210,7 @@ function drawArticles(
     const distance = article.dist;
     const normalizedDist = Math.min(distance / rangeMeters, 1);
 
+    // Bearing is from north (0° = north, 90° = east), convert to canvas coordinates
     const angle = ((bearing - 90) * Math.PI) / 180;
     const x = Math.cos(angle) * (radius * normalizedDist);
     const y = Math.sin(angle) * (radius * normalizedDist);
@@ -294,18 +292,64 @@ function drawCenter(
 
 function drawHeadingIndicator(
   ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number
+  radius: number,
+  heading: number,
+  timestamp: number
 ) {
-  // Triangle at top (direction of travel)
-  ctx.fillStyle = '#00ff41';
+  // Convert heading to radians (heading 0 = north = top of screen = -90° in canvas coords)
+  const angle = ((heading - 90) * Math.PI) / 180;
+
+  // Draw a cone/wedge showing direction user is facing
+  const coneLength = radius * 0.85;
+  const coneWidth = 25 * (Math.PI / 180); // 25 degree cone
+
+  // Pulsing glow
+  const pulse = Math.sin(timestamp / 500) * 0.2 + 0.8;
+
+  // Draw the direction cone
+  ctx.save();
+
+  // Filled cone (semi-transparent)
+  ctx.fillStyle = `rgba(0, 255, 65, ${0.15 * pulse})`;
   ctx.beginPath();
-  ctx.moveTo(x, y - radius - 15);
-  ctx.lineTo(x - 6, y - radius - 5);
-  ctx.lineTo(x + 6, y - radius - 5);
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, coneLength, angle - coneWidth, angle + coneWidth);
   ctx.closePath();
   ctx.fill();
+
+  // Cone outline
+  ctx.strokeStyle = `rgba(0, 255, 65, ${0.5 * pulse})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(Math.cos(angle - coneWidth) * coneLength, Math.sin(angle - coneWidth) * coneLength);
+  ctx.moveTo(0, 0);
+  ctx.lineTo(Math.cos(angle + coneWidth) * coneLength, Math.sin(angle + coneWidth) * coneLength);
+  ctx.stroke();
+
+  // Direction arrow at the tip
+  const arrowX = Math.cos(angle) * (radius - 25);
+  const arrowY = Math.sin(angle) * (radius - 25);
+
+  ctx.fillStyle = '#00ff41';
+  ctx.shadowColor = '#00ff41';
+  ctx.shadowBlur = 8;
+
+  ctx.save();
+  ctx.translate(arrowX, arrowY);
+  ctx.rotate(angle + Math.PI / 2);
+
+  // Triangle arrow
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(-5, 4);
+  ctx.lineTo(5, 4);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 export default Radar;
