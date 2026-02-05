@@ -37,24 +37,15 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // Exclude large WebLLM chunks from precaching
-        globPatterns: ['**/*.{css,html,ico,png,svg,woff2}'],
-        // Increase limit for larger assets
-        maximumFileSizeToCacheInBytes: 10 * 1024 * 1024, // 10MB
+        // Include JS in precache but skip the huge webllm chunk
+        globPatterns: ['**/*.{css,html,ico,png,svg,woff2,js}'],
+        globIgnores: ['**/webllm*.js'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+        // Use NetworkFirst for navigation to avoid stale page issues
+        navigateFallback: null,
         runtimeCaching: [
           {
-            // Cache app JS files at runtime
-            urlPattern: /\.js$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'js-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
-              }
-            }
-          },
-          {
+            // Wikipedia API - network first with cache fallback
             urlPattern: /^https:\/\/en\.wikipedia\.org\/w\/api\.php/,
             handler: 'NetworkFirst',
             options: {
@@ -62,17 +53,33 @@ export default defineConfig({
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
+              },
+              networkTimeoutSeconds: 10
+            }
+          },
+          {
+            // Hugging Face model files - cache first (large files)
+            urlPattern: /^https:\/\/huggingface\.co/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'hf-model-cache',
+              expiration: {
+                maxEntries: 50,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
               }
             }
           },
           {
-            // Cache WebLLM model files
-            urlPattern: /^https:\/\/huggingface\.co/,
+            // CDN resources for transformers.js
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'llm-model-cache',
+              cacheName: 'cdn-cache',
               expiration: {
-                maxEntries: 10,
+                maxEntries: 100,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
               }
             }
@@ -87,13 +94,12 @@ export default defineConfig({
     }
   },
   build: {
-    chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks: {
-          // Separate WebLLM into its own chunk
           'webllm': ['@mlc-ai/web-llm'],
-          // Separate React into its own chunk
+          'transformers': ['@huggingface/transformers'],
           'vendor': ['react', 'react-dom'],
         }
       }

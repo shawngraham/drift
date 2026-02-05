@@ -19,8 +19,6 @@ export function Onboarding() {
     isLoading,
     loadProgress,
     error: llmError,
-    isWebGPUSupported,
-    recommendedBackend,
   } = useLLM();
   const { initialize: initAudio } = useAudio();
 
@@ -80,8 +78,6 @@ export function Onboarding() {
               isLoading={isLoading}
               progress={loadProgress}
               error={llmError}
-              isWebGPUSupported={isWebGPUSupported}
-              recommendedBackend={recommendedBackend}
             />
           )}
 
@@ -204,19 +200,13 @@ function ModelStep({
   isLoading,
   progress,
   error,
-  isWebGPUSupported,
-  recommendedBackend,
 }: {
   onLoad: () => void;
   onSkip: () => void;
   isLoading: boolean;
   progress: number;
   error: string | null;
-  isWebGPUSupported: boolean;
-  recommendedBackend: string;
 }) {
-  const isUsingFallback = recommendedBackend === 'transformers';
-
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -250,9 +240,7 @@ function ModelStep({
             LOADING MODEL... {Math.round(progress * 100)}%
           </p>
           <p className="text-center text-text-secondary text-xs">
-            {isUsingFallback
-              ? 'Loading SmolLM-360M (compact model for this device)'
-              : 'Loading Phi-3-mini (this may take a few minutes)'}
+            Downloading SmolLM-360M (~720MB)
           </p>
         </div>
       ) : error ? (
@@ -275,37 +263,22 @@ function ModelStep({
         </div>
       ) : (
         <div className="space-y-4">
-          {isUsingFallback && (
-            <div className="p-3 bg-amber/10 border border-amber/30 rounded">
-              <p className="text-amber text-xs">
-                WebGPU not available. Using SmolLM-360M via Transformers.js
-                (smaller model, works on most devices).
-              </p>
-            </div>
-          )}
-
-          {isWebGPUSupported && (
-            <div className="p-3 bg-phosphor/10 border border-phosphor/30 rounded">
-              <p className="text-phosphor/80 text-xs">
-                WebGPU detected. Using Phi-3-mini for higher quality
-                transmissions.
-              </p>
-            </div>
-          )}
-
           <p className="text-text-secondary text-sm text-center">
             Load the on-device AI model to generate unique transmissions. The
             model runs entirely on your device—no data is sent to any server.
           </p>
+
+          <div className="p-3 bg-phosphor/10 border border-phosphor/30 rounded">
+            <p className="text-phosphor/80 text-xs text-center">
+              SmolLM-360M • ~720MB download • Works on all devices
+            </p>
+          </div>
 
           <button
             onClick={onLoad}
             className="w-full py-3 bg-phosphor/20 text-phosphor border border-phosphor/50 rounded hover:bg-phosphor/30 transition-colors font-mono"
           >
             LOAD AI MODEL
-            <span className="block text-xs opacity-60 mt-1">
-              {isUsingFallback ? '~720MB download' : '~2GB download'}
-            </span>
           </button>
           <button
             onClick={onSkip}
