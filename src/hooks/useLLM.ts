@@ -4,7 +4,11 @@ import {
   initializeLLM,
   isLLMReady,
   isWebGPUAvailable,
-  getAvailableModels,
+  getWebLLMModels,
+  getTransformersModels,
+  getRecommendedBackend,
+  getCurrentBackend,
+  type LLMBackend,
 } from '../services/llm';
 
 /**
@@ -13,36 +17,31 @@ import {
 export function useLLM() {
   const { llmState, setLLMState } = useAppStore();
 
-  // Initialize the LLM
+  // Initialize the LLM (auto-selects best backend)
   const initialize = useCallback(
     async (modelName?: string) => {
       if (llmState.isReady || llmState.isLoading) return;
 
-      if (!isWebGPUAvailable()) {
-        setLLMState({
-          error: 'WebGPU is not available. Please use a compatible browser.',
-          isLoading: false,
-          isReady: false,
-        });
-        return;
-      }
+      const recommended = getRecommendedBackend();
 
       setLLMState({
         isLoading: true,
         loadProgress: 0,
         error: null,
-        modelName: modelName || getAvailableModels()[0],
+        modelName: modelName || (recommended === 'webllm'
+          ? getWebLLMModels()[0]
+          : 'SmolLM-360M'),
       });
 
       try {
-        await initializeLLM(
-          modelName ? { ...{
+        const backend = await initializeLLM(
+          modelName ? {
             model: modelName,
             temperature: 0.9,
             maxTokens: 150,
             topP: 0.95,
             repetitionPenalty: 1.1,
-          }} : undefined,
+          } : undefined,
           (progress, status) => {
             setLLMState({ loadProgress: progress });
             console.log(`LLM Load: ${(progress * 100).toFixed(0)}% - ${status}`);
@@ -53,6 +52,9 @@ export function useLLM() {
           isLoading: false,
           isReady: true,
           loadProgress: 1,
+          modelName: backend === 'webllm'
+            ? modelName || getWebLLMModels()[0]
+            : 'SmolLM-360M (Transformers.js)',
         });
       } catch (error) {
         console.error('Failed to initialize LLM:', error);
@@ -76,7 +78,10 @@ export function useLLM() {
     error: llmState.error,
     modelName: llmState.modelName,
     isWebGPUSupported: isWebGPUAvailable(),
-    availableModels: getAvailableModels(),
+    recommendedBackend: getRecommendedBackend(),
+    currentBackend: getCurrentBackend() as LLMBackend,
+    webllmModels: getWebLLMModels(),
+    transformersModels: getTransformersModels(),
     initialize,
     checkReady: isLLMReady,
   };
