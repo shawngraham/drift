@@ -275,7 +275,7 @@ function ModelStep({
 
           <div className="p-3 bg-phosphor/10 border border-phosphor/30 rounded">
             <p className="text-phosphor/80 text-xs text-center">
-              Qwen2-0.5B • ~1GB download • Works on all devices
+              Spectral Engine Loaded
             </p>
           </div>
 
