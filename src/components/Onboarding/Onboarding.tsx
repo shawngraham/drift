@@ -245,7 +245,7 @@ function ModelStep({
             LOADING MODEL... {Math.round(progress * 100)}%
           </p>
           <p className="text-center text-text-secondary text-xs">
-            Downloading Qwen2-0.5B (~1GB)
+            Articulating with the Ethereal Plane (please do not chant while you wait)
           </p>
         </div>
       ) : error ? (

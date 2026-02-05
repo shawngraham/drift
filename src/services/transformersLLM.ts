@@ -9,19 +9,19 @@ import { pipeline } from '@huggingface/transformers';
 // Available small models (in order of size/quality tradeoff)
 export const TRANSFORMERS_MODELS = {
   // Smallest - fast but limited
-  SMOL_135M: 'HuggingFaceTB/SmolLM-135M-Instruct',
+  SMOL_135M: 'HuggingFaceTB/SmolLM-135M-Instruct', //find better working with onxx
   // Small - good balance
-  SMOL_360M: 'HuggingFaceTB/SmolLM-360M-Instruct',
+  SMOL_360M: 'HuggingFaceTB/SmolLM-360M-Instruct',//find better working with onxx
   // Medium - better quality
-  QWEN_0_5B: 'Qwen/Qwen2-0.5B-Instruct',
+  OPENELM: 'Xenova/OpenELM-270M-Instruct', //works with onxx
   // Larger - best quality for Transformers.js
-  QWEN_1_5B: 'Qwen/Qwen2-1.5B-Instruct',
+  PHI3: 'Xenova/Phi-3-mini-4k-instruct_fp16', //works with onxx
 } as const;
 
 export type TransformersModelId = typeof TRANSFORMERS_MODELS[keyof typeof TRANSFORMERS_MODELS];
 
 // Default to Qwen2-0.5B for good balance of size and quality
-const DEFAULT_MODEL = TRANSFORMERS_MODELS.QWEN_0_5B;
+const DEFAULT_MODEL = TRANSFORMERS_MODELS.OPENELM;
 
 // Use a more generic type to avoid complex union types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
