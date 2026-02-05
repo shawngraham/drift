@@ -51,8 +51,25 @@ html,
 body,
 #root {
   height: 100%;
+  /* Use dvh for mobile browsers that support it (handles address bar) */
+  height: 100dvh;
   margin: 0;
   padding: 0;
+}
+
+/* Fix for mobile viewport height issues */
+@supports (height: 100dvh) {
+  html, body, #root {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+}
+
+/* Fallback for older browsers */
+@supports not (height: 100dvh) {
+  html, body, #root {
+    min-height: -webkit-fill-available;
+  }
 }
 
 body {

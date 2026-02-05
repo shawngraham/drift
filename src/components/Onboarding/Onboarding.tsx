@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { useLLM } from '../../hooks/useLLM';
 import { useAudio } from '../../hooks/useAudio';
 import { playSonarPing } from '../../services/audioEngine';
+import { isMobileDevice } from '../../services/transformersLLM';
 
 type OnboardingStep = 'intro' | 'location' | 'model' | 'ready';
 
@@ -51,7 +52,7 @@ export function Onboarding() {
   }, [initAudio]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-8 bg-bg-primary">
+    <div className="min-h-[100dvh] flex items-center justify-center p-8 bg-bg-primary" style={{ minHeight: '100dvh' }}>
       <div className="max-w-md w-full space-y-8">
         {/* Logo / Title */}
         <div className="text-center">
@@ -212,6 +213,25 @@ function ModelStep({
   progress: number;
   error: string | null;
 }) {
+  const [isMobile, setIsMobile] = useState(false);
+  const [loadingTime, setLoadingTime] = useState(0);
+
+  useEffect(() => {
+    setIsMobile(isMobileDevice());
+  }, []);
+
+  // Track loading time to show helpful messages
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTime(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingTime((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -245,14 +265,30 @@ function ModelStep({
             LOADING MODEL... {Math.round(progress * 100)}%
           </p>
           <p className="text-center text-text-secondary text-xs">
-            Articulating with the Ethereal Plane (please do not chant while you wait)
+            {loadingTime < 10
+              ? 'Articulating with the Ethereal Plane...'
+              : loadingTime < 30
+              ? 'Downloading neural patterns... (this may take a moment)'
+              : loadingTime < 60
+              ? 'Still working... large models take time to download'
+              : 'This is taking a while. Check your connection if it stalls.'}
           </p>
+          {isMobile && loadingTime > 20 && (
+            <p className="text-center text-amber/60 text-xs">
+              Mobile devices may take longer. Keep this tab active.
+            </p>
+          )}
         </div>
       ) : error ? (
         <div className="space-y-4">
           <div className="p-4 bg-red-900/20 border border-red-900/50 rounded">
             <p className="text-red-400 text-sm">{error}</p>
           </div>
+          {isMobile && (
+            <p className="text-amber/60 text-xs text-center">
+              Mobile browsers have limited memory. Try closing other tabs/apps.
+            </p>
+          )}
           <button
             onClick={onLoad}
             className="w-full py-3 bg-phosphor/20 text-phosphor border border-phosphor/50 rounded hover:bg-phosphor/30 transition-colors font-mono"
@@ -273,9 +309,18 @@ function ModelStep({
             model runs entirely on your device—no data is sent to any server.
           </p>
 
+          {isMobile && (
+            <div className="p-3 bg-amber/10 border border-amber/30 rounded">
+              <p className="text-amber/80 text-xs text-center">
+                Mobile device detected. Model loading may take 1-2 minutes.
+                Keep screen on and tab active.
+              </p>
+            </div>
+          )}
+
           <div className="p-3 bg-phosphor/10 border border-phosphor/30 rounded">
             <p className="text-phosphor/80 text-xs text-center">
-              Spectral Engine Loaded
+              Spectral Engine: ~270MB download
             </p>
           </div>
 
