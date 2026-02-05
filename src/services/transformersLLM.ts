@@ -1,4 +1,10 @@
-import { pipeline } from '@huggingface/transformers';
+import { pipeline, env } from '@huggingface/transformers';
+
+// Configure Transformers.js for better mobile compatibility
+// Disable local model check to force CDN fetch
+env.allowLocalModels = false;
+// Use remote models from Hugging Face CDN
+env.useBrowserCache = true;
 
 /**
  * Transformers.js LLM Service
@@ -48,22 +54,64 @@ export function isMobileDevice(): boolean {
 }
 
 /**
+ * Check if SharedArrayBuffer is available (needed for multithreaded WASM)
+ */
+export function isSharedArrayBufferAvailable(): boolean {
+  try {
+    return typeof SharedArrayBuffer !== 'undefined';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get detailed device capabilities for debugging
+ */
+export function getDeviceCapabilities(): {
+  isMobile: boolean;
+  hasWebGL: boolean;
+  hasWebGL2: boolean;
+  hasSharedArrayBuffer: boolean;
+  userAgent: string;
+  hardwareConcurrency: number;
+  deviceMemory: number | null;
+} {
+  let hasWebGL = false;
+  let hasWebGL2 = false;
+
+  try {
+    const canvas = document.createElement('canvas');
+    hasWebGL = !!canvas.getContext('webgl');
+    hasWebGL2 = !!canvas.getContext('webgl2');
+  } catch {
+    // WebGL not available
+  }
+
+  return {
+    isMobile: isMobileDevice(),
+    hasWebGL,
+    hasWebGL2,
+    hasSharedArrayBuffer: isSharedArrayBufferAvailable(),
+    userAgent: navigator.userAgent,
+    hardwareConcurrency: navigator.hardwareConcurrency || 1,
+    deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory || null,
+  };
+}
+
+/**
  * Check if Transformers.js can run (WebGL or WASM available)
  */
 export function isTransformersSupported(): boolean {
-  // Transformers.js uses ONNX runtime which works on most browsers
-  // via WebGL or WASM fallback
-  try {
-    // Check for basic WebGL support
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('webgl2');
-    if (!gl) {
-      console.warn('WebGL not available, will fall back to WASM');
-    }
-    return true;
-  } catch {
-    return true; // WASM fallback should still work
+  const caps = getDeviceCapabilities();
+  console.log('[Transformers.js] Device capabilities:', caps);
+
+  // Transformers.js can run on most browsers via WASM
+  // SharedArrayBuffer improves performance but isn't required
+  if (!caps.hasSharedArrayBuffer) {
+    console.warn('[Transformers.js] SharedArrayBuffer not available - will use single-threaded WASM (slower but should work)');
   }
+
+  return true;
 }
 
 // Timeout for model loading (longer on mobile due to slower connections)
@@ -89,6 +137,11 @@ export async function loadTransformersModel(
   let lastProgressTime = Date.now();
   let progressCheckInterval: ReturnType<typeof setInterval> | undefined;
 
+  // Log device capabilities at load time
+  const caps = getDeviceCapabilities();
+  console.log('[Transformers.js] Starting model load:', modelId);
+  console.log('[Transformers.js] Device:', caps);
+
   try {
     onProgress?.({ status: 'downloading', progress: 0 });
 
@@ -106,7 +159,12 @@ export async function loadTransformersModel(
       progressCheckInterval = setInterval(() => {
         const stallTime = Date.now() - lastProgressTime;
         if (stallTime > 30000 && isLoading) {
-          console.warn(`Model loading stalled for ${Math.round(stallTime / 1000)}s`);
+          console.warn(`[Transformers.js] Model loading stalled for ${Math.round(stallTime / 1000)}s`);
+          onProgress?.({
+            status: 'downloading',
+            progress: 0.01,
+            file: 'Loading stalled - check console for errors'
+          });
         }
       }, 10000);
 
@@ -116,10 +174,15 @@ export async function loadTransformersModel(
 
     // Create the actual loading promise
     const loadPromise = (async () => {
+      console.log('[Transformers.js] Calling pipeline()...');
+
       // Use type assertion to avoid complex union type errors
       const result = await (pipeline as Function)('text-generation', modelId, {
         progress_callback: (progressData: { status: string; progress?: number; file?: string }) => {
           lastProgressTime = Date.now(); // Update last progress time
+
+          // Log all progress events for debugging
+          console.log('[Transformers.js] Progress:', progressData);
 
           if (progressData.status === 'progress' && progressData.progress !== undefined) {
             // Clamp progress to 0-100 range (Transformers.js returns 0-100)
@@ -130,12 +193,15 @@ export async function loadTransformersModel(
               file: progressData.file,
             });
           } else if (progressData.status === 'done') {
+            console.log('[Transformers.js] File done:', progressData.file);
             onProgress?.({ status: 'loading', progress: 0.95 });
           } else if (progressData.status === 'initiate') {
-            console.log(`Starting download: ${progressData.file}`);
+            console.log('[Transformers.js] Starting download:', progressData.file);
           }
         },
       });
+
+      console.log('[Transformers.js] Pipeline returned successfully');
       return result;
     })();
 
