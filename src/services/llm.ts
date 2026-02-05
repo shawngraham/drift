@@ -30,17 +30,17 @@ export function isWebGPUAvailable(): boolean {
 }
 
 /**
- * Get the recommended backend for this device
+ * Get the default backend - always Transformers.js for faster initial load
+ * WebLLM is available as an upgrade option for users with WebGPU
  */
 export function getRecommendedBackend(): LLMBackend {
-  if (isWebGPUAvailable()) {
-    return 'webllm';
-  }
+  // Default to Transformers.js for faster initial experience
+  // SmolLM-360M is ~720MB vs Phi-3-mini at ~2GB
   return 'transformers';
 }
 
 /**
- * Get available WebLLM models
+ * Get available WebLLM models (requires WebGPU)
  */
 export function getWebLLMModels(): string[] {
   return [
@@ -51,7 +51,7 @@ export function getWebLLMModels(): string[] {
 }
 
 /**
- * Get available Transformers.js models (smaller, for fallback)
+ * Get available Transformers.js models (default, works everywhere)
  */
 export function getTransformersModels(): { id: TransformersModelId; name: string; size: string }[] {
   return [
@@ -63,7 +63,7 @@ export function getTransformersModels(): { id: TransformersModelId; name: string
 }
 
 /**
- * Initialize LLM with WebLLM (requires WebGPU)
+ * Initialize LLM with WebLLM (requires WebGPU) - optional upgrade
  */
 export async function initializeWebLLM(
   config: LLMConfig = DEFAULT_LLM_CONFIG,
@@ -73,7 +73,7 @@ export async function initializeWebLLM(
   if (initPromise) return initPromise;
 
   if (!isWebGPUAvailable()) {
-    throw new Error('WebGPU is not available in this browser. Use initializeTransformers instead.');
+    throw new Error('WebGPU is not available in this browser.');
   }
 
   isInitializing = true;
@@ -103,7 +103,7 @@ export async function initializeWebLLM(
 }
 
 /**
- * Initialize LLM with Transformers.js (fallback, works without WebGPU)
+ * Initialize LLM with Transformers.js (default, works everywhere)
  */
 export async function initializeTransformers(
   modelId: TransformersModelId = TRANSFORMERS_MODELS.SMOL_360M,
@@ -132,26 +132,14 @@ export async function initializeTransformers(
 }
 
 /**
- * Initialize the best available LLM backend
- * Tries WebLLM first, falls back to Transformers.js
+ * Initialize the LLM - uses Transformers.js by default for faster load
  */
 export async function initializeLLM(
-  config: LLMConfig = DEFAULT_LLM_CONFIG,
+  _config: LLMConfig = DEFAULT_LLM_CONFIG,
   onProgress?: ProgressCallback
 ): Promise<LLMBackend> {
-  const recommended = getRecommendedBackend();
-
-  if (recommended === 'webllm') {
-    try {
-      await initializeWebLLM(config, onProgress);
-      return 'webllm';
-    } catch (error) {
-      console.warn('WebLLM initialization failed, falling back to Transformers.js:', error);
-      // Fall through to Transformers.js
-    }
-  }
-
-  // Use Transformers.js as fallback
+  // Always use Transformers.js by default for faster initial load
+  // Users can optionally switch to WebLLM later for better quality
   await initializeTransformers(TRANSFORMERS_MODELS.SMOL_360M, onProgress);
   return 'transformers';
 }
