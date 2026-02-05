@@ -57,9 +57,9 @@ export function getTransformersModels(): { id: TransformersModelId; name: string
   return [
     { id: TRANSFORMERS_MODELS.SMOL_135M, name: 'SmolLM 135M', size: '~270MB' },
     { id: TRANSFORMERS_MODELS.SMOL_360M, name: 'SmolLM 360M', size: '~720MB' },
-    { id: TRANSFORMERS_MODELS.QWEN_0_5B, name: 'Qwen2 0.5B', size: '~1GB' },
-    { id: TRANSFORMERS_MODELS.QWEN_1_5B, name: 'Qwen2 1.5B', size: '~3GB' },
-  ];
+    { id: TRANSFORMERS_MODELS.OPENELM, name: 'OpenELM', size: '~270MB' },
+    { id: TRANSFORMERS_MODELS.PHI3, name: 'Phi3', size: 'oh, around 1 gb maybe?' },
+  ]; 
 }
 
 /**
