@@ -32,9 +32,15 @@ export function Onboarding() {
   }, [requestPermission]);
 
   const handleLoadModel = useCallback(async () => {
-    await initLLM();
-    await initAudio();
-    setStep('ready');
+    console.log('[Onboarding] Starting model load...');
+    const success = await initLLM();
+    console.log('[Onboarding] Model load result:', success);
+
+    if (success) {
+      await initAudio();
+      setStep('ready');
+    }
+    // If failed, stay on 'model' step - error will be shown via llmError prop
   }, [initLLM, initAudio]);
 
   const handleComplete = useCallback(async () => {

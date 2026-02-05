@@ -18,11 +18,25 @@ export function useLLM() {
   const { llmState, setLLMState } = useAppStore();
 
   // Initialize the LLM (auto-selects best backend)
+  // Returns true if successful, false if failed
   const initialize = useCallback(
-    async (modelName?: string) => {
-      if (llmState.isReady || llmState.isLoading) return;
+    async (modelName?: string): Promise<boolean> => {
+      // Read current state directly from store to avoid stale closures
+      const currentState = useAppStore.getState().llmState;
+
+      if (currentState.isReady) {
+        console.log('[useLLM] Already ready, skipping init');
+        return true;
+      }
+
+      if (currentState.isLoading) {
+        console.log('[useLLM] Already loading, skipping init');
+        return false;
+      }
 
       const recommended = getRecommendedBackend();
+
+      console.log('[useLLM] Starting initialization...');
 
       setLLMState({
         isLoading: true,
@@ -44,9 +58,11 @@ export function useLLM() {
           } : undefined,
           (progress, status) => {
             setLLMState({ loadProgress: progress });
-            console.log(`LLM Load: ${(progress * 100).toFixed(0)}% - ${status}`);
+            console.log(`[useLLM] Load: ${(progress * 100).toFixed(0)}% - ${status}`);
           }
         );
+
+        console.log('[useLLM] Initialization successful, backend:', backend);
 
         setLLMState({
           isLoading: false,
@@ -56,19 +72,24 @@ export function useLLM() {
             ? modelName || getWebLLMModels()[0]
             : 'SmolLM-360M (Transformers.js)',
         });
+
+        return true;
       } catch (error) {
-        console.error('Failed to initialize LLM:', error);
+        console.error('[useLLM] Failed to initialize LLM:', error);
+        const errorMessage = error instanceof Error
+          ? error.message
+          : 'Failed to load the AI model';
+
         setLLMState({
           isLoading: false,
           isReady: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Failed to load the AI model',
+          error: errorMessage,
         });
+
+        return false;
       }
     },
-    [llmState.isReady, llmState.isLoading, setLLMState]
+    [setLLMState]
   );
 
   return {
