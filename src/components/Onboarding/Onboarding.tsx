@@ -3,6 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { useGeolocation } from '../../hooks/useGeolocation';
 import { useLLM } from '../../hooks/useLLM';
 import { useAudio } from '../../hooks/useAudio';
+import { playSonarPing } from '../../services/audioEngine';
 
 type OnboardingStep = 'intro' | 'location' | 'model' | 'ready';
 
@@ -20,7 +21,7 @@ export function Onboarding() {
     loadProgress,
     error: llmError,
   } = useLLM();
-  const { initialize: initAudio } = useAudio();
+  const { initialize: initAudio, start: startAudio } = useAudio();
 
   const handleRequestLocation = useCallback(async () => {
     const granted = await requestPermission();
@@ -35,10 +36,14 @@ export function Onboarding() {
     setStep('ready');
   }, [initLLM, initAudio]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback(async () => {
+    // Start audio (static layer) when entering drift mode
+    await startAudio();
+    // Play a sonar ping to confirm audio is working
+    setTimeout(() => playSonarPing(), 300);
     setHasCompletedOnboarding(true);
     setView('drift');
-  }, [setHasCompletedOnboarding, setView]);
+  }, [setHasCompletedOnboarding, setView, startAudio]);
 
   const handleSkipModel = useCallback(async () => {
     await initAudio();
@@ -240,7 +245,7 @@ function ModelStep({
             LOADING MODEL... {Math.round(progress * 100)}%
           </p>
           <p className="text-center text-text-secondary text-xs">
-            Downloading SmolLM-360M (~720MB)
+            Downloading Qwen2-0.5B (~1GB)
           </p>
         </div>
       ) : error ? (
@@ -270,7 +275,7 @@ function ModelStep({
 
           <div className="p-3 bg-phosphor/10 border border-phosphor/30 rounded">
             <p className="text-phosphor/80 text-xs text-center">
-              SmolLM-360M • ~720MB download • Works on all devices
+              Qwen2-0.5B • ~1GB download • Works on all devices
             </p>
           </div>
 

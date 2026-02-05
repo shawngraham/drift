@@ -12,6 +12,8 @@ import {
   isSpeaking,
   isStaticPlaying,
   disposeAudio,
+  startSonarPings,
+  stopSonarPings,
 } from '../services/audioEngine';
 import type { TransmissionLog } from '../types';
 
@@ -50,6 +52,7 @@ export function useAudio() {
   const stop = useCallback(() => {
     stopStatic();
     stopSpeaking();
+    stopSonarPings();
     setAudioState({ isPlaying: false, isSpeaking: false });
   }, [setAudioState]);
 
@@ -121,5 +124,7 @@ export function useAudio() {
     speak,
     checkPlaying: isStaticPlaying,
     checkSpeaking: isSpeaking,
+    startSonarPings,
+    stopSonarPings,
   };
 }

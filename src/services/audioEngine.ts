@@ -16,6 +16,7 @@ let currentIntensity = 0.3;
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 let availableVoices: SpeechSynthesisVoice[] = [];
 let voicesLoaded = false;
+let sonarInterval: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Initialize the audio context and load voices
@@ -290,6 +291,65 @@ export function playFailedTransmission(): Promise<void> {
 }
 
 /**
+ * Play a single sonar ping sound
+ */
+export function playSonarPing(): void {
+  if (!audioContext || !masterGain) return;
+
+  // Resume context if suspended
+  if (audioContext.state === 'suspended') {
+    audioContext.resume();
+  }
+
+  const now = audioContext.currentTime;
+
+  // Create oscillator for the ping tone
+  const oscillator = audioContext.createOscillator();
+  const pingGain = audioContext.createGain();
+
+  // Sonar-like frequency (around 1.5kHz)
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(1500, now);
+  oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+
+  // Quick attack, longer decay
+  pingGain.gain.setValueAtTime(0, now);
+  pingGain.gain.linearRampToValueAtTime(0.15, now + 0.01);
+  pingGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+  oscillator.connect(pingGain);
+  pingGain.connect(masterGain);
+
+  oscillator.start(now);
+  oscillator.stop(now + 0.5);
+}
+
+/**
+ * Start sonar pings during generation
+ */
+export function startSonarPings(): void {
+  if (sonarInterval) return;
+
+  // Play first ping immediately
+  playSonarPing();
+
+  // Then ping every 2 seconds
+  sonarInterval = setInterval(() => {
+    playSonarPing();
+  }, 2000);
+}
+
+/**
+ * Stop sonar pings
+ */
+export function stopSonarPings(): void {
+  if (sonarInterval) {
+    clearInterval(sonarInterval);
+    sonarInterval = null;
+  }
+}
+
+/**
  * Get available voices
  */
 export function getAvailableVoices(): SpeechSynthesisVoice[] {
@@ -302,6 +362,7 @@ export function getAvailableVoices(): SpeechSynthesisVoice[] {
 export function disposeAudio(): void {
   stopStatic();
   stopSpeaking();
+  stopSonarPings();
   if (audioContext) {
     audioContext.close();
     audioContext = null;

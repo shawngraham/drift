@@ -29,7 +29,7 @@ export function useTransmissions() {
     setRecentTransmissions,
   } = useAppStore();
 
-  const { speak, isPlaying } = useAudio();
+  const { speak, isPlaying, startSonarPings, stopSonarPings } = useAudio();
 
   // Load recent transmissions from database
   useEffect(() => {
@@ -46,8 +46,14 @@ export function useTransmissions() {
 
     setIsGenerating(true);
 
+    // Start sonar pings while generating
+    startSonarPings();
+
     try {
       const result = await generateTransmission(position, nearbyArticles);
+
+      // Stop sonar pings before speaking
+      stopSonarPings();
 
       setCurrentPhantom(result.phantom);
       setCurrentTransmission(result.transmission);
@@ -63,6 +69,7 @@ export function useTransmissions() {
       return result.transmission;
     } catch (error) {
       console.error('Failed to generate transmission:', error);
+      stopSonarPings();
       return null;
     } finally {
       setIsGenerating(false);
@@ -80,6 +87,8 @@ export function useTransmissions() {
     setLastGeneratedAt,
     addTransmission,
     speak,
+    startSonarPings,
+    stopSonarPings,
   ]);
 
   // Auto-generate transmissions based on triggers

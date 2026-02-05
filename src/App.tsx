@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAppStore } from './stores/appStore';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useWikipedia } from './hooks/useWikipedia';
@@ -26,6 +26,8 @@ function App() {
 
   // Calculate radar size based on screen
   const [radarSize, setRadarSize] = useState(280);
+  const [showGhostMessage, setShowGhostMessage] = useState(false);
+  const previousTransmissionRef = useRef(currentTransmission);
 
   useEffect(() => {
     const updateSize = () => {
@@ -40,6 +42,16 @@ function App() {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  // Show ghost message when new transmission is logged
+  useEffect(() => {
+    if (currentTransmission && currentTransmission !== previousTransmissionRef.current) {
+      previousTransmissionRef.current = currentTransmission;
+      setShowGhostMessage(true);
+      const timeout = setTimeout(() => setShowGhostMessage(false), 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [currentTransmission]);
 
   // Initialize hooks
   useGeolocation();
@@ -79,7 +91,7 @@ function App() {
           {/* History button */}
           <button
             onClick={() => setView('history')}
-            className="p-2 text-phosphor/60 hover:text-phosphor transition-colors"
+            className="p-2 text-phosphor/60 hover:text-phosphor active:scale-90 active:text-phosphor transition-all"
             aria-label="Transmission history"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -91,10 +103,10 @@ function App() {
           {/* Audio toggle */}
           <button
             onClick={toggle}
-            className={`p-2 rounded-full border transition-all ${
+            className={`p-2 rounded-full border transition-all active:scale-90 ${
               isPlaying
-                ? 'bg-phosphor/20 border-phosphor text-phosphor'
-                : 'border-phosphor/30 text-phosphor/60 hover:border-phosphor/60'
+                ? 'bg-phosphor/20 border-phosphor text-phosphor active:bg-phosphor/40'
+                : 'border-phosphor/30 text-phosphor/60 hover:border-phosphor/60 active:border-phosphor'
             } ${isSpeaking ? 'animate-pulse' : ''}`}
             aria-label={isPlaying ? 'Stop audio' : 'Start audio'}
           >
@@ -117,10 +129,10 @@ function App() {
           <button
             onClick={() => generate()}
             disabled={isGenerating || !llmState.isReady}
-            className={`p-2 transition-colors ${
+            className={`p-2 transition-all ${
               isGenerating || !llmState.isReady
                 ? 'text-text-secondary/30 cursor-not-allowed'
-                : 'text-phosphor/60 hover:text-phosphor'
+                : 'text-phosphor/60 hover:text-phosphor active:scale-90 active:text-phosphor'
             }`}
             aria-label="Generate transmission"
           >
@@ -133,7 +145,7 @@ function App() {
           {/* Settings button */}
           <button
             onClick={() => setView('settings')}
-            className="p-2 text-phosphor/60 hover:text-phosphor transition-colors"
+            className="p-2 text-phosphor/60 hover:text-phosphor active:scale-90 active:text-phosphor transition-all"
             aria-label="Settings"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -194,6 +206,15 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* Ghost message notification */}
+      {showGhostMessage && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-phosphor/10 border border-phosphor/30 rounded-full animate-pulse">
+          <span className="text-phosphor/70 text-xs font-mono tracking-wider">
+            TRANSCRIBED TO AUTO-LOG
+          </span>
+        </div>
+      )}
     </div>
   );
 }
