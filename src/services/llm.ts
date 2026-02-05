@@ -140,7 +140,7 @@ export async function initializeLLM(
 ): Promise<LLMBackend> {
   // Always use Transformers.js by default for faster initial load
   // Users can optionally switch to WebLLM later for better quality
-  await initializeTransformers(TRANSFORMERS_MODELS.QWEN_0_5B, onProgress);
+  await initializeTransformers(TRANSFORMERS_MODELS.OPENELM, onProgress);
   return 'transformers';
 }
 
