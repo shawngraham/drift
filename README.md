@@ -1,6 +1,6 @@
 # Aethereal Drift
 
-A psychogeographic exploration PWA that transforms physical movement into transmissions from parallel dimensions.
+A psychogeographic exploration progressive web app (PWA) that transforms physical movement into transmissions from parallel dimensions. (PWA: you open in your phone's browser, and you can then pin it to your home screen.)
 
 ## Overview
 
