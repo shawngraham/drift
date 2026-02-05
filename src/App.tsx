@@ -83,8 +83,9 @@ function App() {
   }
 
   // Main drift view - optimized for mobile
+  // Using min-h-dvh with fallback for proper mobile viewport handling
   return (
-    <div className="h-screen flex flex-col bg-bg-primary text-text-primary overflow-hidden">
+    <div className="min-h-[100dvh] h-[100dvh] flex flex-col bg-bg-primary text-text-primary overflow-hidden" style={{ minHeight: '100dvh', height: '100dvh' }}>
       {/* Top controls bar */}
       <div className="flex-shrink-0 px-3 py-2 border-b border-phosphor/20 bg-bg-secondary/30">
         <div className="flex items-center justify-between max-w-md mx-auto">
