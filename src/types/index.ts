@@ -138,8 +138,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
 
 export const DEFAULT_LLM_CONFIG: LLMConfig = {
   model: 'Phi-3-mini-4k-instruct-q4f16_1-MLC',
-  temperature: 0.9,
-  maxTokens: 150,
-  topP: 0.95,
-  repetitionPenalty: 1.1,
+  temperature: 0.85,
+  maxTokens: 120,
+  topP: 0.92,
+  repetitionPenalty: 1.15,
 };

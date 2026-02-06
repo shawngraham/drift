@@ -8,6 +8,7 @@ import {
   getTransformersModels,
   getRecommendedBackend,
   getCurrentBackend,
+  getCurrentModel,
   type LLMBackend,
 } from '../services/llm';
 
@@ -34,17 +35,13 @@ export function useLLM() {
         return false;
       }
 
-      const recommended = getRecommendedBackend();
-
       console.log('[useLLM] Starting initialization...');
 
       setLLMState({
         isLoading: true,
         loadProgress: 0,
         error: null,
-        modelName: modelName || (recommended === 'webllm'
-          ? getWebLLMModels()[0]
-          : 'SmolLM-360M'),
+        modelName: modelName || 'Auto-selecting best model...',
       });
 
       try {
@@ -68,9 +65,7 @@ export function useLLM() {
           isLoading: false,
           isReady: true,
           loadProgress: 1,
-          modelName: backend === 'webllm'
-            ? modelName || getWebLLMModels()[0]
-            : 'SmolLM-360M (Transformers.js)',
+          modelName: getCurrentModel() || modelName || 'Unknown model',
         });
 
         return true;

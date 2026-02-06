@@ -6,6 +6,8 @@ import {
   generateWithTransformers,
   isTransformersModelLoaded,
   unloadTransformersModel,
+  getCurrentTransformersModel,
+  selectModelForDevice,
   TRANSFORMERS_MODELS,
   type TransformersModelId,
 } from './transformersLLM';
@@ -35,7 +37,7 @@ export function isWebGPUAvailable(): boolean {
  */
 export function getRecommendedBackend(): LLMBackend {
   // Default to Transformers.js for faster initial experience
-  // SmolLM-360M is ~720MB vs Phi-3-mini at ~2GB
+  // SmolLM2/Qwen models are auto-selected based on device capabilities
   return 'transformers';
 }
 
@@ -52,14 +54,15 @@ export function getWebLLMModels(): string[] {
 
 /**
  * Get available Transformers.js models (default, works everywhere)
+ * Sizes shown are approximate download sizes with quantization applied
  */
 export function getTransformersModels(): { id: TransformersModelId; name: string; size: string }[] {
   return [
-    { id: TRANSFORMERS_MODELS.SMOL_135M, name: 'SmolLM 135M', size: '~270MB' },
-    { id: TRANSFORMERS_MODELS.SMOL_360M, name: 'SmolLM 360M', size: '~720MB' },
-    { id: TRANSFORMERS_MODELS.OPENELM, name: 'OpenELM', size: '~270MB' },
-    { id: TRANSFORMERS_MODELS.PHI3, name: 'Phi3', size: 'oh, around 1 gb maybe?' },
-  ]; 
+    { id: TRANSFORMERS_MODELS.SMOL2_135M, name: 'SmolLM2 135M', size: '~150MB (q8)' },
+    { id: TRANSFORMERS_MODELS.SMOL2_360M, name: 'SmolLM2 360M', size: '~400MB (q8)' },
+    { id: TRANSFORMERS_MODELS.QWEN_05B, name: 'Qwen1.5 0.5B', size: '~350MB (q4)' },
+    { id: TRANSFORMERS_MODELS.PHI3, name: 'Phi-3 Mini', size: '~800MB (q4)' },
+  ];
 }
 
 /**
@@ -106,10 +109,12 @@ export async function initializeWebLLM(
  * Initialize LLM with Transformers.js (default, works everywhere)
  */
 export async function initializeTransformers(
-  modelId: TransformersModelId = TRANSFORMERS_MODELS.SMOL_360M,
+  modelId?: TransformersModelId,
   onProgress?: ProgressCallback
 ): Promise<void> {
-  console.log('[llm] initializeTransformers called with model:', modelId);
+  // Auto-select best model for device if none specified
+  const selectedModel = modelId || selectModelForDevice();
+  console.log('[llm] initializeTransformers called with model:', selectedModel);
 
   if (isTransformersModelLoaded()) {
     console.log('[llm] Model already loaded, skipping');
@@ -120,7 +125,7 @@ export async function initializeTransformers(
   console.log('[llm] Starting Transformers.js initialization...');
 
   try {
-    await loadTransformersModel(modelId, (progress) => {
+    await loadTransformersModel(selectedModel, (progress) => {
       const pct = progress.progress;
       const status = progress.status === 'downloading'
         ? `Downloading${progress.file ? `: ${progress.file}` : '...'}`
@@ -143,6 +148,7 @@ export async function initializeTransformers(
 
 /**
  * Initialize the LLM - uses Transformers.js by default for faster load
+ * Auto-selects the best model for the device when no config model is specified
  */
 export async function initializeLLM(
   _config: LLMConfig = DEFAULT_LLM_CONFIG,
@@ -151,9 +157,10 @@ export async function initializeLLM(
   console.log('[llm] initializeLLM called');
 
   // Always use Transformers.js by default for faster initial load
+  // Model is auto-selected based on device capabilities
   // Users can optionally switch to WebLLM later for better quality
   try {
-    await initializeTransformers(TRANSFORMERS_MODELS.OPENELM, onProgress);
+    await initializeTransformers(undefined, onProgress);
     console.log('[llm] initializeLLM completed successfully');
     return 'transformers';
   } catch (error) {
@@ -219,6 +226,7 @@ export async function generateText(
         maxNewTokens: fullConfig.maxTokens,
         temperature: fullConfig.temperature,
         topP: fullConfig.topP,
+        repetitionPenalty: fullConfig.repetitionPenalty,
       });
     } catch (error) {
       console.error('Transformers.js generation error:', error);
@@ -260,7 +268,13 @@ export function getCurrentModel(): string | null {
     return DEFAULT_LLM_CONFIG.model;
   }
   if (currentBackend === 'transformers') {
-    return 'Qwen2-0.5B (Transformers.js)';
+    const modelId = getCurrentTransformersModel();
+    if (modelId) {
+      // Extract a readable name from the model path
+      const parts = modelId.split('/');
+      return `${parts[parts.length - 1]} (Transformers.js)`;
+    }
+    return 'Transformers.js';
   }
   return null;
 }
