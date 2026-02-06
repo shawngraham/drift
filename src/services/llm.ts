@@ -1,4 +1,12 @@
-import * as webllm from '@mlc-ai/web-llm';
+/**
+ * LLM Service - orchestrates model backends
+ *
+ * IMPORTANT: WebLLM is loaded via dynamic import to avoid
+ * "can't access lexical declaration before initialization" errors.
+ * The WebLLM bundle (5MB+) has complex internal initialization that
+ * fails with TDZ errors when eagerly loaded on many browsers.
+ */
+
 import type { LLMConfig } from '../types';
 import { DEFAULT_LLM_CONFIG } from '../types';
 import {
@@ -17,7 +25,9 @@ import {
  */
 export type LLMBackend = 'webllm' | 'transformers' | 'none';
 
-let engine: webllm.MLCEngine | null = null;
+// WebLLM engine is lazily loaded - no static import to avoid TDZ errors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let engine: any = null;
 let isInitializing = false;
 let initPromise: Promise<void> | null = null;
 let currentBackend: LLMBackend = 'none';
@@ -67,6 +77,8 @@ export function getTransformersModels(): { id: TransformersModelId; name: string
 
 /**
  * Initialize LLM with WebLLM (requires WebGPU) - optional upgrade
+ * Uses dynamic import to avoid "can't access lexical declaration before initialization"
+ * errors caused by the WebLLM bundle's complex initialization code.
  */
 export async function initializeWebLLM(
   config: LLMConfig = DEFAULT_LLM_CONFIG,
@@ -83,9 +95,12 @@ export async function initializeWebLLM(
 
   initPromise = (async () => {
     try {
+      // Dynamic import to avoid eager loading of 5MB+ WebLLM bundle
+      const webllm = await import('@mlc-ai/web-llm');
+
       engine = new webllm.MLCEngine();
 
-      engine.setInitProgressCallback((report) => {
+      engine.setInitProgressCallback((report: { progress?: number; text?: string }) => {
         const progress = report.progress || 0;
         const status = report.text || 'Loading...';
         onProgress?.(progress, status);

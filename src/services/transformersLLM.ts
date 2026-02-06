@@ -240,50 +240,62 @@ export async function loadTransformersModel(
       // Dynamically import the library to avoid mobile initialization issues
       const transformers = await getTransformers();
 
-      // Select optimal dtype and device for this model
-      const dtype = MODEL_DTYPE_DEFAULTS[modelId] || 'q8';
-      const device = getOptimalDevice();
-      console.log(`[Transformers.js] Loading ${modelId} with dtype=${dtype}, device=${device}`);
+      // Progress callback shared across attempts
+      const progressCallback = (progressData: { status: string; progress?: number; file?: string }) => {
+        lastProgressTime = Date.now();
+        console.log('[Transformers.js] Progress:', progressData);
 
-      // Build pipeline options with quantization and device acceleration
-      const pipelineOptions: Record<string, unknown> = {
-        dtype,
-        progress_callback: (progressData: { status: string; progress?: number; file?: string }) => {
-          lastProgressTime = Date.now(); // Update last progress time
-
-          // Log all progress events for debugging
-          console.log('[Transformers.js] Progress:', progressData);
-
-          if (progressData.status === 'progress' && progressData.progress !== undefined) {
-            // Clamp progress to 0-100 range (Transformers.js returns 0-100)
-            const clampedProgress = Math.min(100, Math.max(0, progressData.progress)) / 100;
-            onProgress?.({
-              status: 'downloading',
-              progress: clampedProgress,
-              file: progressData.file,
-            });
-          } else if (progressData.status === 'done') {
-            console.log('[Transformers.js] File done:', progressData.file);
-            onProgress?.({ status: 'loading', progress: 0.95 });
-          } else if (progressData.status === 'initiate') {
-            console.log('[Transformers.js] Starting download:', progressData.file);
-          }
-        },
+        if (progressData.status === 'progress' && progressData.progress !== undefined) {
+          const clampedProgress = Math.min(100, Math.max(0, progressData.progress)) / 100;
+          onProgress?.({
+            status: 'downloading',
+            progress: clampedProgress,
+            file: progressData.file,
+          });
+        } else if (progressData.status === 'done') {
+          console.log('[Transformers.js] File done:', progressData.file);
+          onProgress?.({ status: 'loading', progress: 0.95 });
+        } else if (progressData.status === 'initiate') {
+          console.log('[Transformers.js] Starting download:', progressData.file);
+        }
       };
 
-      // Only set device to webgpu if available (wasm is the default fallback)
-      if (device === 'webgpu') {
-        pipelineOptions.device = 'webgpu';
+      // Try loading with quantization + device acceleration first,
+      // fall back to defaults if the model doesn't have quantized ONNX files
+      const dtype = MODEL_DTYPE_DEFAULTS[modelId];
+      const device = getOptimalDevice();
+
+      if (dtype) {
+        try {
+          console.log(`[Transformers.js] Attempting ${modelId} with dtype=${dtype}, device=${device}`);
+          const pipelineOptions: Record<string, unknown> = {
+            dtype,
+            progress_callback: progressCallback,
+          };
+          if (device === 'webgpu') {
+            pipelineOptions.device = 'webgpu';
+          }
+
+          const result = await (transformers.pipeline as Function)(
+            'text-generation',
+            modelId,
+            pipelineOptions,
+          );
+          console.log('[Transformers.js] Pipeline returned successfully (quantized)');
+          return result;
+        } catch (quantizedError) {
+          console.warn('[Transformers.js] Quantized load failed, retrying without dtype/device:', quantizedError);
+        }
       }
 
-      // Use type assertion to avoid complex union type errors
+      // Fallback: load without dtype/device options (uses model defaults)
+      console.log(`[Transformers.js] Loading ${modelId} with default options`);
       const result = await (transformers.pipeline as Function)(
         'text-generation',
         modelId,
-        pipelineOptions,
+        { progress_callback: progressCallback },
       );
-
-      console.log('[Transformers.js] Pipeline returned successfully');
+      console.log('[Transformers.js] Pipeline returned successfully (default)');
       return result;
     })();
 
