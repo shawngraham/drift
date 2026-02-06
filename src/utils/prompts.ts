@@ -3,31 +3,28 @@ import { getBearingInfo, formatCoordinates } from './coordinates';
 
 /**
  * System prompt that establishes the generative frame
+ * Optimized for small on-device models (135M-500M parameters):
+ * - Concise to minimize prompt token usage
+ * - Clear constraints to keep output focused
+ * - Strong priming to guide creative direction
  */
-export const SYSTEM_PROMPT = `You are a receiver tuned to frequencies from adjacent dimensions. You intercept transmissions from places that almost exist—the spaces between documented reality. Your reports are brief, evocative, and slightly wrong in unsettling ways.
+export const SYSTEM_PROMPT = `You report transmissions from places that almost exist—spaces between documented reality. Brief, evocative, clinically wrong.
 
-Guidelines:
-- Generate 2-4 sentences only
-- Describe what exists at the phantom location, not at the documented places
-- Be specific but impossible—concrete details about unreal things
-- Maintain a tone of clinical observation mixed with subtle wrongness
-- Never explain or meta-comment—just report
-- Avoid clichés about ghosts, portals, or standard supernatural tropes
-- Reference the nearby anchors obliquely—as if seen from another angle of reality`;
+Rules: 2-4 sentences only. Concrete impossible details. No ghosts, portals, or clichés. No meta-commentary. Reference nearby places obliquely, as if from another angle of reality.`;
 
 /**
- * Style-specific instructions
+ * Style-specific instructions (concise for small model token budgets)
  */
 const STYLE_INSTRUCTIONS: Record<TransmissionStyle, string> = {
-  fragment: `Style: Fragmentary field note. Incomplete sentences. Data corruption evident. Mid-observation interruption.`,
+  fragment: `Style: Fragmentary field note. Incomplete sentences. Data corruption. Mid-observation interruption.`,
 
-  catalog: `Style: Catalog entry from an impossible museum. Clinical documentation of an artifact or phenomenon. Include classification numbers that shouldn't exist.`,
+  catalog: `Style: Catalog entry from an impossible museum. Clinical. Include classification numbers that shouldn't exist.`,
 
-  field_note: `Style: Surveyor's field note. Technical observations of geography that contradicts itself. Measurements that don't add up.`,
+  field_note: `Style: Surveyor's field note. Technical geography that contradicts itself. Measurements that don't add up.`,
 
-  signal: `Style: Intercepted radio transmission. Partial. Static-damaged. Someone reporting coordinates they shouldn't be at.`,
+  signal: `Style: Intercepted radio transmission. Partial. Static-damaged. Coordinates they shouldn't be at.`,
 
-  whisper: `Style: Whispered memory. First-person observation. The speaker isn't sure they're real. Past and present tense blur.`,
+  whisper: `Style: Whispered memory. First-person. The speaker isn't sure they're real. Tense blurs.`,
 };
 
 /**
@@ -62,14 +59,11 @@ export function constructPrompt(
 
   return `${SYSTEM_PROMPT}
 
-Nearby anchors in consensus reality:
-${anchorDescriptions || '- [No documented locations in range]'}
+Nearby anchors:
+${anchorDescriptions || '- [No documented locations]'}
 
-Observer position: ${userCoords}
-Phantom coordinates: ${phantomCoords}
-Dimensional drift: ${phantom.dimensionalDrift.toFixed(4)}°
-
-You are located in the space BETWEEN these documented places. Generate a brief transmission (2-4 sentences) describing what exists at your phantom location—something adjacent to but distinct from the documented anchors. This is not summary. This is interstitial. Speak as if reporting from a place that almost exists.
+Observer: ${userCoords}
+Phantom: ${phantomCoords} (drift: ${phantom.dimensionalDrift.toFixed(4)}°)
 
 ${styleInstructions}
 
@@ -89,12 +83,9 @@ export function constructEmptySpacePrompt(
 
   return `${SYSTEM_PROMPT}
 
-No documented locations detected within range. You are in undocumented space—a gap in the map where nothing is officially recorded.
+No documented locations in range. Undocumented space—a gap in the map.
 
-Phantom coordinates: ${phantomCoords}
-Dimensional drift: ${phantom.dimensionalDrift.toFixed(4)}°
-
-This absence is significant. Generate a brief transmission (2-4 sentences) describing what exists in this cartographic void—the things that persist specifically because no one has documented them.
+Phantom: ${phantomCoords} (drift: ${phantom.dimensionalDrift.toFixed(4)}°)
 
 ${styleInstructions}
 

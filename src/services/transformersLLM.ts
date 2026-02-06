@@ -41,22 +41,54 @@ async function getTransformers() {
   }
 }
 
-// Available small models (in order of size/quality tradeoff)
+// Available models optimized for in-browser inference via Transformers.js + ONNX
+// SmolLM2 models: trained on 2-4T tokens with DPO alignment (successor to SmolLM v1)
+// Xenova models: ONNX-converted by Xenova (HF staff), proven browser compatibility
 export const TRANSFORMERS_MODELS = {
-  // Smallest - fast but limited
-  SMOL_135M: 'HuggingFaceTB/SmolLM-135M-Instruct', //find better working with onxx
-  // Small - good balance
-  SMOL_360M: 'HuggingFaceTB/SmolLM-360M-Instruct',//find better working with onxx
-  // Medium - better quality
-  OPENELM: 'Xenova/OpenELM-270M-Instruct', //works with onxx
-  // Larger - best quality for Transformers.js
-  PHI3: 'Xenova/Phi-3-mini-4k-instruct_fp16', //works with onxx
+  // Smallest - fast inference, good for low-end mobile (~270MB)
+  SMOL2_135M: 'HuggingFaceTB/SmolLM2-135M-Instruct',
+  // Small - best balance of quality and speed (~720MB, trained on 4T tokens + DPO)
+  SMOL2_360M: 'HuggingFaceTB/SmolLM2-360M-Instruct',
+  // Medium - strong instruction following, Xenova ONNX (~500MB)
+  QWEN_05B: 'Xenova/Qwen1.5-0.5B-Chat',
+  // Larger - best quality for Transformers.js, Xenova ONNX (quantized, ~800MB)
+  PHI3: 'Xenova/Phi-3-mini-4k-instruct',
 } as const;
 
 export type TransformersModelId = typeof TRANSFORMERS_MODELS[keyof typeof TRANSFORMERS_MODELS];
 
-// Default to Qwen2-0.5B for good balance of size and quality
-const DEFAULT_MODEL = TRANSFORMERS_MODELS.OPENELM;
+// Default to SmolLM2-360M: excellent quality/size ratio, 4T training tokens, DPO-aligned
+const DEFAULT_MODEL = TRANSFORMERS_MODELS.SMOL2_360M;
+
+// Quantization dtype options for ONNX models
+export type ModelDtype = 'fp32' | 'fp16' | 'q8' | 'q4' | 'q4f16';
+
+// Model-specific optimal dtype defaults (balancing size vs quality)
+const MODEL_DTYPE_DEFAULTS: Record<string, ModelDtype> = {
+  [TRANSFORMERS_MODELS.SMOL2_135M]: 'q8',   // Small enough that q8 is fine
+  [TRANSFORMERS_MODELS.SMOL2_360M]: 'q8',   // Good quality at q8
+  [TRANSFORMERS_MODELS.QWEN_05B]: 'q4',     // Larger model benefits from q4 compression
+  [TRANSFORMERS_MODELS.PHI3]: 'q4',          // Large model, q4 keeps download manageable
+};
+
+/**
+ * Check if WebGPU is available for accelerated inference
+ */
+export function hasWebGPU(): boolean {
+  return 'gpu' in navigator;
+}
+
+/**
+ * Get the optimal device for inference based on browser capabilities
+ */
+function getOptimalDevice(): string {
+  if (hasWebGPU()) {
+    console.log('[Transformers.js] WebGPU available - using GPU acceleration');
+    return 'webgpu';
+  }
+  console.log('[Transformers.js] No WebGPU - using WASM (CPU) backend');
+  return 'wasm';
+}
 
 // Use a more generic type to avoid complex union types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,8 +240,14 @@ export async function loadTransformersModel(
       // Dynamically import the library to avoid mobile initialization issues
       const transformers = await getTransformers();
 
-      // Use type assertion to avoid complex union type errors
-      const result = await (transformers.pipeline as Function)('text-generation', modelId, {
+      // Select optimal dtype and device for this model
+      const dtype = MODEL_DTYPE_DEFAULTS[modelId] || 'q8';
+      const device = getOptimalDevice();
+      console.log(`[Transformers.js] Loading ${modelId} with dtype=${dtype}, device=${device}`);
+
+      // Build pipeline options with quantization and device acceleration
+      const pipelineOptions: Record<string, unknown> = {
+        dtype,
         progress_callback: (progressData: { status: string; progress?: number; file?: string }) => {
           lastProgressTime = Date.now(); // Update last progress time
 
@@ -231,7 +269,19 @@ export async function loadTransformersModel(
             console.log('[Transformers.js] Starting download:', progressData.file);
           }
         },
-      });
+      };
+
+      // Only set device to webgpu if available (wasm is the default fallback)
+      if (device === 'webgpu') {
+        pipelineOptions.device = 'webgpu';
+      }
+
+      // Use type assertion to avoid complex union type errors
+      const result = await (transformers.pipeline as Function)(
+        'text-generation',
+        modelId,
+        pipelineOptions,
+      );
 
       console.log('[Transformers.js] Pipeline returned successfully');
       return result;
@@ -272,6 +322,33 @@ export async function loadTransformersModel(
 }
 
 /**
+ * Select the best model based on device capabilities
+ * Returns the most capable model the device can reasonably handle
+ */
+export function selectModelForDevice(): TransformersModelId {
+  const caps = getDeviceCapabilities();
+
+  // Desktop with good specs: use Qwen 0.5B for best quality
+  if (!caps.isMobile && caps.hardwareConcurrency >= 4) {
+    const memory = caps.deviceMemory ?? 8;
+    if (memory >= 4) {
+      console.log('[Transformers.js] Desktop with good specs → Qwen1.5-0.5B-Chat');
+      return TRANSFORMERS_MODELS.QWEN_05B;
+    }
+  }
+
+  // Mobile or limited desktop: use SmolLM2-360M for good quality at manageable size
+  if (!caps.isMobile || (caps.hardwareConcurrency >= 4 && (caps.deviceMemory ?? 4) >= 4)) {
+    console.log('[Transformers.js] Standard device → SmolLM2-360M');
+    return TRANSFORMERS_MODELS.SMOL2_360M;
+  }
+
+  // Low-end mobile: use SmolLM2-135M for fastest inference
+  console.log('[Transformers.js] Low-end device → SmolLM2-135M');
+  return TRANSFORMERS_MODELS.SMOL2_135M;
+}
+
+/**
  * Generate text using Transformers.js
  */
 export async function generateWithTransformers(
@@ -280,6 +357,7 @@ export async function generateWithTransformers(
     maxNewTokens?: number;
     temperature?: number;
     topP?: number;
+    repetitionPenalty?: number;
     doSample?: boolean;
   } = {}
 ): Promise<string> {
@@ -288,9 +366,10 @@ export async function generateWithTransformers(
   }
 
   const {
-    maxNewTokens = 150,
-    temperature = 0.8,
-    topP = 0.9,
+    maxNewTokens = 120,
+    temperature = 0.85,
+    topP = 0.92,
+    repetitionPenalty = 1.15,
     doSample = true,
   } = options;
 
@@ -298,6 +377,7 @@ export async function generateWithTransformers(
     max_new_tokens: maxNewTokens,
     temperature,
     top_p: topP,
+    repetition_penalty: repetitionPenalty,
     do_sample: doSample,
     return_full_text: false,
   });
