@@ -98,7 +98,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'webllm': ['@mlc-ai/web-llm'],
+          // WebLLM is dynamically imported (lazy-loaded) so Rollup handles its chunking
           'transformers': ['@huggingface/transformers'],
           'vendor': ['react', 'react-dom'],
         }
